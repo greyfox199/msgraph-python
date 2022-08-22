@@ -185,3 +185,6 @@ with open(str(config["pathToExportFilesDir"]) + "/msgraph-export.csv", 'w', newl
     writer.writerow(["userPrincipalName", "id", "phoneAuthenticationMethod", "fido2AuthenticationMethod", "softwareOathAuthenticationMethod", "microsoftAuthenticatorAuthenticationMethod", "mfaRegistered"])
     for item in userData:
         writer.writerow([item["userPrincipalName"], item["id"], item["phoneAuthenticationMethod"], item["fido2AuthenticationMethod"], item["softwareOathAuthenticationMethod"], item["microsoftAuthenticatorAuthenticationMethod"], item["mfaRegistered"]])
+
+print("JSON file available at " + str(config["pathToExportFilesDir"]) + "/msgraph-export.json")
+print("CSV file available at " + str(config["pathToExportFilesDir"]) + "/msgraph-export.csv")
