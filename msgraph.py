@@ -49,8 +49,10 @@ except Exception as e:
     print("Config file of " + ConfigFilePath + " is not a valid json file, aborting process")
     exit()
 
+#create config dictionary object to hold configuration items
 config = {}
 
+#function to do general validation on json configuration items
 def validateJSONConfig(section, key):
     if key in jsonData[section]:
         try:
@@ -62,20 +64,23 @@ def validateJSONConfig(section, key):
         print("required field of " + key + " in config does not exist, aborting proces")
         exit()
 
+#validate all required keys in config file
 validateJSONConfig("required", "client_id")
 validateJSONConfig("required", "client_secret")
 validateJSONConfig("required", "authority")
 validateJSONConfig("required", "pathToExportFilesDir")
 
-
+#since pathToExportFilesDir is a local path, validate that it exists before proceeding
 if not exists(config["pathToExportFilesDir"]):
     print("local path of " + config["pathToExportFilesDir"] + "does not exist, aborting process")
     exit()
 
+#set up variables for use later in script globally
 scope = "https://graph.microsoft.com/.default"
 userData = []
 record = {}
 
+#validate optoinal json data, if it doesn't exist, use default value passed in
 def validateOptionalJSON(section, key, default):
     if key in jsonData[section]:
         try:
@@ -87,9 +92,10 @@ def validateOptionalJSON(section, key, default):
         print(key + " not present in config, using default")
         config.update({key:[default]})
 
-
+#validate optional configuration items
 validateOptionalJSON("optional", "scope", scope)
 
+#function to make api call to ms graph, doing pagination if required
 def make_graph_caller(url, pagination=True):
     token_result = client.acquire_token_silent(config['scope'], account=None)
 
@@ -121,7 +127,7 @@ def make_graph_caller(url, pagination=True):
 
     return graph_results
 
-
+#authenticate to ms graph using data from configuration file
 client = msal.ConfidentialClientApplication(config['client_id'], authority=config['authority'], client_credential=config['client_secret'])
 
 ##url = 'https://graph.microsoft.com/beta/reports/credentialUserRegistrationDetails'
@@ -133,27 +139,29 @@ client = msal.ConfidentialClientApplication(config['client_id'], authority=confi
 #    print(data['userPrincipalName'])
 #    print(data['isMfaRegistered'])
 
-url = 'https://graph.microsoft.com/v1.0/users'
+#attempt to query all users via users graph endpoint
+url = 'https://graph.microsoft.com/beta/users'
 graph_data = make_graph_caller(url, pagination=True)
-print("############ USERS #########")
 for data in graph_data:
-    print("-----------user------------")
-    print("UPN: " + data['userPrincipalName'])
-    print("display name: " + data['displayName'])
+
+    #initiallize record dictionary per user and start populating it with data per user
     record = {}
     record["userPrincipalName"] = data['userPrincipalName']
     record["id"] = data['id']
-    #record.update({"userPrincipalName:" + data['userPrincipalName']})
-    #record.update({"Id:" + data['Id']})
 
+    #now that we have data per user, call graph endpoint to get authentication method details
     url = 'https://graph.microsoft.com/beta/users/' + data['userPrincipalName'] + '/authentication/methods'
     graph_sub_data = make_graph_caller(url, pagination=True)
+
+    #initialize some variables per user before processing authentication methods data
     blnMFARegistered = False
 
     record["phoneAuthenticationMethod"] = "FALSE"
     record["fido2AuthenticationMethod"] = "FALSE"
     record["softwareOathAuthenticationMethod"] = "FALSE"
     record["microsoftAuthenticatorAuthenticationMethod"] = "FALSE"
+
+    #loop through each authentication method and store values
     for sub_data in graph_sub_data:
         print("\t" + sub_data['@odata.type'])
         if sub_data['@odata.type'] == '#microsoft.graph.phoneAuthenticationMethod' or sub_data['@odata.type'] == '#microsoft.graph.fido2AuthenticationMethod' or sub_data['@odata.type'] == '#microsoft.graph.softwareOathAuthenticationMethod' or sub_data['@odata.type'] == '#microsoft.graph.microsoftAuthenticatorAuthenticationMethod':
@@ -172,20 +180,20 @@ for data in graph_data:
             record["microsoftAuthenticatorAuthenticationMethod"] = "TRUE"
 
     if blnMFARegistered == True:
-        print('\tMFA Registered Status: TRUE')
         record["mfaRegistered"] = "TRUE"
     else:
-        print('\tMFA Registered Status: FALSE')
         record["mfaRegistered"] = "FALSE"
 
+    #append user data to array for later processing
     userData.append(record)
 
-for item in userData:
-    print(item["userPrincipalName"])
 
+#now that we have all our user data in an array, export it to both json and csv file
+#export user data to json file using path from config file
 with open(str(config["pathToExportFilesDir"]) + "/msgraph-export.json", "w") as json_file:
     json.dump(userData, json_file, indent=4)
 
+#export user data to csv file using path from config file
 with open(str(config["pathToExportFilesDir"]) + "/msgraph-export.csv", 'w', newline='') as csv_file:
     writer = csv.writer(csv_file)
     writer.writerow(["userPrincipalName", "id", "phoneAuthenticationMethod", "fido2AuthenticationMethod", "softwareOathAuthenticationMethod", "microsoftAuthenticatorAuthenticationMethod", "mfaRegistered"])
