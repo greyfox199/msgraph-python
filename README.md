@@ -33,10 +33,60 @@ The simplest file will be this:
     "required": {
         "client_id": "[INSERT YOUR CLIENT ID]",
         "client_secret": "[INSERT YOUR CLIENT SECRET]",
-        "authority": "https://login.microsoftonline.com/[INSERT YOUR TENANT ID]"
+        "authority": "https://login.microsoftonline.com/[INSERT YOUR TENANT ID]",
+        "pathToExportFilesDir": "/path/to/exportfiles/dir"
     }
 }
 ```
 **client_id**: This is the "Application (client) ID" from the azure app registration created for the graph api.  
 **client_secret**: This is the "Value" for the "Secret ID" created under "client secrets" for the app registration created for the graph api.   
 **authority**:  This is the login.microsoft.com url appended with your "Directory (tenant) ID" from your Azure tenant.   
+**pathToExportFilesDir**: This is the path that will be used to write the exported json and csv files for the mfa report
+
+The complete list of optional parameters is as follows:  
+
+```json
+{
+    "required": {
+       "client_id": "[INSERT YOUR CLIENT ID]",
+        "client_secret": "[INSERT YOUR CLIENT SECRET]",
+        "authority": "https://login.microsoftonline.com/[INSERT YOUR TENANT ID]",
+        "pathToExportFilesDir": "/path/to/exportfiles/dir"
+    },
+    "optional": {
+        "scope": "https://graph.microsoft.com/.default"
+    }
+}
+```
+
+**scope**: This is a scope that entails what permissions will be used when using the ms graph api endpoints.  If a value is not provided, "https://graph.microsoft.com/.default" will be used as a default value, which should suffice in most cases.   
+
+# output
+This will create two files, a json-formatted file and a csv file.  
+
+the json-formatted file will have a name of msgraph-export.json in the specified pathToExportFilesDir config entry.  It will have the following structure:
+
+[
+    {
+        "userPrincipalName": "upn@domain.name",
+        "id": "[id of azure user object]",
+        "phoneAuthenticationMethod": "[TRUE | FALSE]",
+        "fido2AuthenticationMethod": "[TRUE | FALSE]",
+        "softwareOathAuthenticationMethod": "[TRUE | FALSE]",
+        "microsoftAuthenticatorAuthenticationMethod": "[TRUE | FALSE]",
+        "mfaRegistered": "[TRUE | FALSE]"
+    }
+]
+
+the csv file will have a name of msgraph-export.csv in the specified pathToExportFilesDir config entry.  It willl have the following structure:
+
+userPrincipalName,id,phoneAuthenticationMethod,fido2AuthenticationMethod,softwareOathAuthenticationMethod,microsoftAuthenticatorAuthenticationMethod,mfaRegistered
+upn@domain.name,[id of azure user object],[TRUE | FALSE],[TRUE | FALSE],[TRUE | FALSE],[TRUE | FALSE],[TRUE | FALSE]
+
+The following keys/columns will contain TRUE or FALSE depending on whether the user has registered the method in question:
+-phoneAuthenticationMethod   
+-fido2AuthenticationMethod   
+-softwareOathAuthenticationMethod   
+-microsoftAuthenticatorAuthenticationMethod   
+
+The key/column of mfaRegistered will have a value of TRUE if any of the methods listed above are set by the user, and will have a value of FALSE if none of the methods listed have been registered.
