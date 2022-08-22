@@ -163,7 +163,6 @@ for data in graph_data:
 
     #loop through each authentication method and store values
     for sub_data in graph_sub_data:
-        print("\t" + sub_data['@odata.type'])
         if sub_data['@odata.type'] == '#microsoft.graph.phoneAuthenticationMethod' or sub_data['@odata.type'] == '#microsoft.graph.fido2AuthenticationMethod' or sub_data['@odata.type'] == '#microsoft.graph.softwareOathAuthenticationMethod' or sub_data['@odata.type'] == '#microsoft.graph.microsoftAuthenticatorAuthenticationMethod':
             blnMFARegistered = True
 
