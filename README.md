@@ -78,7 +78,7 @@ the json-formatted file will have a name of msgraph-export.json in the specified
         "mfaRegistered": "[TRUE | FALSE]"
     }
 ]
-```json
+```
 
 the csv file will have a name of msgraph-export.csv in the specified pathToExportFilesDir config entry.  It willl have the following structure:
 
