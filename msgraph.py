@@ -96,39 +96,52 @@ def validateOptionalJSON(section, key, default):
 validateOptionalJSON("optional", "scope", scope)
 
 #function to make api call to ms graph, doing pagination if required
-def getGraphData(url, pagination=True):
-    tokenResult = client.acquire_token_silent(config['scope'], account=None)
+def make_graph_caller(url, pagination=True):
+    token_result = client.acquire_token_silent(config['scope'], account=None)
 
-    if not tokenResult:
-        tokenResult = client.acquire_token_for_client(scopes=config['scope'])
+    #if token_result:
+        #print('Access token was loaded from cache')
 
-    if 'access_token' in tokenResult:
-        headers = {'Authorization': 'Bearer ' + tokenResult['access_token']}
-        graphData = []
+    if not token_result:
+        token_result = client.acquire_token_for_client(scopes=config['scope'])
+        #print('New access token aquired from AAD')
+
+    if 'access_token' in token_result:
+        headers = {'Authorization': 'Bearer ' + token_result['access_token']}
+        graph_results = []
         
         while url:
             try:
-                graphData = requests.get(url=url, headers=headers).json()
-                graphData.extend(graphData['value'])
+                graph_result = requests.get(url=url, headers=headers).json()
+                graph_results.extend(graph_result['value'])
                 if (pagination == True):
-                    url = graphData['@odata.nextLink']
+                    url = graph_result['@odata.nextLink']
                 else:
                     url = None
             except:
                 break
     else:
-        print(tokenResult.get('error'))
-        print(tokenResult.get('error_description'))
-        print(tokenResult.get('correlation'))
+        print(token_result.get('error'))
+        print(token_result.get('error_description'))
+        print(token_result.get('correlation'))
 
-    return graphData
+    return graph_results
 
 #authenticate to ms graph using data from configuration file
 client = msal.ConfidentialClientApplication(config['client_id'], authority=config['authority'], client_credential=config['client_secret'])
 
+##url = 'https://graph.microsoft.com/beta/reports/credentialUserRegistrationDetails'
+#url = 'https://graph.microsoft.com/beta/reports/authenticationMethods/userRegistrationDetails'
+#graph_data = make_graph_caller(url, pagination=True)
+
+#print("############ MFA REG DETAILS #############")
+#for data in graph_data:
+#    print(data['userPrincipalName'])
+#    print(data['isMfaRegistered'])
+
 #attempt to query all users via users graph endpoint
 url = 'https://graph.microsoft.com/beta/users'
-graph_data = getGraphData(url, pagination=True)
+graph_data = make_graph_caller(url, pagination=True)
 for data in graph_data:
 
     #initiallize record dictionary per user and start populating it with data per user
@@ -138,7 +151,7 @@ for data in graph_data:
 
     #now that we have data per user, call graph endpoint to get authentication method details
     url = 'https://graph.microsoft.com/beta/users/' + data['userPrincipalName'] + '/authentication/methods'
-    graph_sub_data = getGraphData(url, pagination=True)
+    graph_sub_data = make_graph_caller(url, pagination=True)
 
     #initialize some variables per user before processing authentication methods data
     blnMFARegistered = False
