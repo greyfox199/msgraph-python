@@ -6,6 +6,7 @@ import json
 import socket
 from datetime import datetime
 import logging
+import csv
 
 
 argumentList = sys.argv[1:]
@@ -64,6 +65,12 @@ def validateJSONConfig(section, key):
 validateJSONConfig("required", "client_id")
 validateJSONConfig("required", "client_secret")
 validateJSONConfig("required", "authority")
+validateJSONConfig("required", "pathToExportFilesDir")
+
+
+if not exists(config["pathToExportFilesDir"]):
+    print("local path of " + config["pathToExportFilesDir"] + "does not exist, aborting process")
+    exit()
 
 scope = "https://graph.microsoft.com/.default"
 userData = []
@@ -128,27 +135,59 @@ client = msal.ConfidentialClientApplication(config['client_id'], authority=confi
 
 url = 'https://graph.microsoft.com/v1.0/users'
 graph_data = make_graph_caller(url, pagination=True)
-
 print("############ USERS #########")
 for data in graph_data:
     print("-----------user------------")
     print("UPN: " + data['userPrincipalName'])
     print("display name: " + data['displayName'])
-    #record.append({"userPrincipalName:" + data['userPrincipalName']})
-    #record.append({"Id:" + data['Id']})
-    #print(record)
+    record = {}
+    record["userPrincipalName"] = data['userPrincipalName']
+    record["id"] = data['id']
+    #record.update({"userPrincipalName:" + data['userPrincipalName']})
+    #record.update({"Id:" + data['Id']})
 
     url = 'https://graph.microsoft.com/beta/users/' + data['userPrincipalName'] + '/authentication/methods'
     graph_sub_data = make_graph_caller(url, pagination=True)
-    
     blnMFARegistered = False
+
+    record["phoneAuthenticationMethod"] = "FALSE"
+    record["fido2AuthenticationMethod"] = "FALSE"
+    record["softwareOathAuthenticationMethod"] = "FALSE"
+    record["microsoftAuthenticatorAuthenticationMethod"] = "FALSE"
     for sub_data in graph_sub_data:
-        #print(sub_data)
         print("\t" + sub_data['@odata.type'])
-        if sub_data['@odata.type'] == '#microsoft.graph.phoneAuthenticationMethod' or sub_data['@odata.type'] == '#microsoft.graph.fido2AuthenticationMethod' or sub_data['@odata.type'] == '#microsoft.graph.softwareOathAuthenticationMethod':
+        if sub_data['@odata.type'] == '#microsoft.graph.phoneAuthenticationMethod' or sub_data['@odata.type'] == '#microsoft.graph.fido2AuthenticationMethod' or sub_data['@odata.type'] == '#microsoft.graph.softwareOathAuthenticationMethod' or sub_data['@odata.type'] == '#microsoft.graph.microsoftAuthenticatorAuthenticationMethod':
             blnMFARegistered = True
+
+        if sub_data['@odata.type'] == '#microsoft.graph.phoneAuthenticationMethod':
+            record["phoneAuthenticationMethod"] = "TRUE"
+
+        if sub_data['@odata.type'] == '#microsoft.graph.fido2AuthenticationMethod':
+            record["fido2AuthenticationMethod"] = "TRUE"
+
+        if sub_data['@odata.type'] == '#microsoft.graph.softwareOathAuthenticationMethod':
+            record["softwareOathAuthenticationMethod"] = "TRUE"
+
+        if sub_data['@odata.type'] == '#microsoft.graph.microsoftAuthenticatorAuthenticationMethod':
+            record["microsoftAuthenticatorAuthenticationMethod"] = "TRUE"
+
     if blnMFARegistered == True:
         print('\tMFA Registered Status: TRUE')
+        record["mfaRegistered"] = "TRUE"
     else:
         print('\tMFA Registered Status: FALSE')
+        record["mfaRegistered"] = "FALSE"
 
+    userData.append(record)
+
+for item in userData:
+    print(item["userPrincipalName"])
+
+with open(str(config["pathToExportFilesDir"]) + "/msgraph-export.json", "w") as json_file:
+    json.dump(userData, json_file, indent=4)
+
+with open(str(config["pathToExportFilesDir"]) + "/msgraph-export.csv", 'w', newline='') as csv_file:
+    writer = csv.writer(csv_file)
+    writer.writerow(["userPrincipalName", "id", "phoneAuthenticationMethod", "fido2AuthenticationMethod", "softwareOathAuthenticationMethod", "microsoftAuthenticatorAuthenticationMethod", "mfaRegistered"])
+    for item in userData:
+        writer.writerow([item["userPrincipalName"], item["id"], item["phoneAuthenticationMethod"], item["fido2AuthenticationMethod"], item["softwareOathAuthenticationMethod"], item["microsoftAuthenticatorAuthenticationMethod"], item["mfaRegistered"]])
